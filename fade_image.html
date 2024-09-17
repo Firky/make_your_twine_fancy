@@ -1,0 +1,3067 @@
+﻿<!DOCTYPE html>
+<!--[if lte IE 8]><html class="lt-ie9"><![endif]-->
+<!--[if gt IE 8]><!--><html><!--<![endif]-->
+<head>
+<meta charset="utf-8">
+<title>fade__image</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+Made in Twine 1.4.3 (running on Windows 10)
+Built on 21 Apr 2024 at 17:25:27, +1000
+
+Sugarcane is based on:
+
+TiddlyWiki 1.2.39 by Jeremy Ruston, (jeremy [at] osmosoft [dot] com)
+
+Published under a BSD open source license
+
+Copyright (c) Osmosoft Limited 2005
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
+
+Redistributions in binary form must reproduce the above copyright notice, this
+list of conditions and the following disclaimer in the documentation and/or other
+materials provided with the distribution.
+
+Neither the name of the Osmosoft Limited nor the names of its contributors may be
+used to endorse or promote products derived from this software without specific
+prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT
+SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+-->
+<script title="engine">
+(function(){
+
+/*
+**
+** Basic utility functions
+**
+*/
+
+function clone(a) {
+    var constructor, b, proto;
+    // Primitive types and functions are flat-out passed by value.
+    if (!a || typeof a != "object") {
+        return a;
+    }
+    constructor = a.constructor;
+    if (constructor == Date || constructor == RegExp) {
+        b = new constructor(a);
+    }
+    else if (constructor == Array) {
+        b = [];
+    }
+    else if (a.nodeType && typeof a.cloneNode == "function") {
+        b = a.cloneNode(true);
+    }
+    else {
+        proto = (typeof Object.getPrototypeOf == "function" ? Object.getPrototypeOf(a) : a.__proto__);
+        b = proto ? Object.create(proto) : {};
+    }
+    // This should work on both arrays and objects equally -
+    // even copying expando properties foolishly added to arrays.
+    for (var property in a) {
+        if (Object.prototype.hasOwnProperty.call(a,property) && !isCyclic(a[property])) {
+            if (typeof a[property] == "object") {
+                try {
+                    b[property] = clone(a[property]);
+                    continue;
+                }
+                catch(e) {}
+            }
+            b[property] = a[property];
+        }
+    }
+    return b;
+}
+
+function isCyclic(obj) {
+    var properties = [];
+    return (function recurse(obj) {
+        var key, i, ownProps = [];
+        if (obj && typeof obj == "object") {
+            if (properties.indexOf(obj) > -1) {
+                return true;
+            }
+            properties.push(obj);
+            for (key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj,key) && recurse(obj[key])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }(obj));
+}
+
+function insertElement(a, d, f, c, e) {
+    var b = document.createElement(d);
+    if (f) {
+        b.id = f
+    }
+    if (c) {
+        b.className = c
+    }
+    if (e) {
+        insertText(b, e)
+    }
+    if (a) {
+        a.appendChild(b)
+    }
+    return b
+}
+
+function addClickHandler(el, fn) {
+    if (el.addEventListener) {
+        el.addEventListener('click', fn); 
+    } else if (el.attachEvent)  {
+        el.attachEvent('onclick', fn);
+    }
+}
+
+function insertText(a, b) {
+    return a.appendChild(document.createTextNode(b))
+}
+
+function removeChildren(a) {
+    while (a.hasChildNodes()) {
+        a.removeChild(a.firstChild)
+    }
+}
+
+function findPassageParent(el) {
+    while(el && el != document.body && !~el.className.indexOf("passage")) {
+        el = el.parentNode;
+    }
+    return el == document.body ? null : el;
+}
+
+function setPageElement(c, b, a) {
+    var place;
+    if (place = (typeof c == "string" ? document.getElementById(c) : c)) {
+        removeChildren(place);
+        if (tale.has(b)) {
+            new Wikifier(place, tale.get(b).processText())
+        } else {
+            new Wikifier(place, a)
+        }
+    }
+}
+
+var scrollWindowInterval;
+function scrollWindowTo(e, margin) {
+    var d = window.scrollY ? window.scrollY : document.documentElement.scrollTop,
+        m = window.innerHeight ? window.innerHeight : document.documentElement.clientHeight,
+        g = k(e),
+        j = (d > g) ? -1 : 1,
+        b = 0,
+        c = Math.abs(d - g);
+    scrollWindowInterval && window.clearInterval(scrollWindowInterval);
+    if (c) {
+        scrollWindowInterval = window.setInterval(h, 25);
+    }
+    
+    function h() {
+        b += 0.1;
+        window.scrollTo(0, d + j * (c * Math.easeInOut(b)));
+        if (b >= 1) {
+            window.clearInterval(scrollWindowInterval)
+        }
+    }
+
+    function k(o) {
+        var p = a(o),
+            h = o.offsetHeight,
+            n = d + m;
+        p = Math.min(Math.max(p + (margin || 0) * ( p < d ? -1 : 1), 0), n);
+        if (p < d) {
+            return p
+        } else {
+            if (p+h > n) {
+                if (h < m) {
+                    return (p - (m - h) + 20)
+                } else {
+                    return p
+                }
+            } else {
+                return p
+            }
+        }
+    }
+
+    function a(l) {
+        var m = 0;
+        while (l.offsetParent) {
+            m += l.offsetTop;
+            l = l.offsetParent
+        }
+        return m
+    }
+}
+
+// Returns an object containing the properties in neu which differ from old.
+function delta(old,neu) {
+    var vars, ret = {};
+    if (old && neu) {
+        for (vars in neu) {
+            if (neu[vars] !== old[vars]) {
+                ret[vars] = neu[vars];
+            }
+        }
+    }
+    return ret;
+}
+
+// Convert various exotic objects into JSON-serialisable plain objects.
+function decompile(val) {
+    var i, ret;
+    if ((typeof val != "object" && typeof val != "function") || !val) {
+        return val;
+    }
+    // Passage objects: store only their name
+    else if (val instanceof Passage) {
+        return { "[[Passage]]" : val.id };
+    }
+    else if (Array.isArray(val)) {
+        ret = [];
+    }
+    else {
+        ret = {};
+    }
+    // Deep-copy own properties
+    for (i in val) {
+        if (Object.prototype.hasOwnProperty.call(val,i) && !isCyclic(val[i])) {
+            ret[i] = decompile(val[i]);
+        }
+    }
+    // Functions: store the decompiled function body as a property
+    // arbitrarily called "[[Call]]".
+    if (typeof val == "function" || val instanceof RegExp) {
+        try {
+            // Check if it can be recompiled (i.e. isn't a bound or native)
+            internalEval(val+"");
+            ret["[[Call]]"] = val+"";
+        } catch(e) {
+            // Silently fail
+            ret["[[Call]]"] = "function(){}"
+        }
+    }
+    return ret;
+}
+
+// Reverses the effects of decompile()
+// Takes recently JSON.parse()d objects and makes them exotic again.
+function recompile(val) {
+    var i, ret = val;
+    if (val && typeof val == "object") {
+        // Passages
+        if (typeof val["[[Passage]]"] == "number") {
+            return tale.get(val["[[Passage]]"]);
+        }
+        // Functions/RegExps
+        if (typeof val["[[Call]]"] == "string") {
+            try {
+                ret = internalEval(val["[[Call]]"]);
+            }
+            catch(e){}
+        }
+        // Recursively recompile all properties
+        // or, if a function/regexp, deep-copy them to the new function.
+        for (i in val) {
+            if (Object.prototype.hasOwnProperty.call(val,i)) {
+                ret[i] = recompile(val[i]);
+            }
+        }
+    }
+    return ret;
+}
+
+function addStyle(b) {
+    if (document.createStyleSheet) {
+        document.getElementsByTagName("head")[0].insertAdjacentHTML("beforeEnd", "&nbsp;<style>" + b + "</style>")
+    } else {
+        var a = document.createElement("style");
+        a.appendChild(document.createTextNode(b));
+        document.getElementsByTagName("head")[0].appendChild(a)
+    }
+}
+
+function alterCSS(text) {
+    var temp = '', imgPassages = tale.lookup("tags", "Twine.image");
+    // Remove comments
+    text = text.replace(/\/\*(?:[^\*]|\*(?!\/))*\*\//g,'');
+    // Replace :link
+    text = text.replace(/:link/g,"[class*=Link]");
+    // Replace :visited
+    text = text.replace(/:visited/g,".visitedLink");
+    // Hoist @import
+    text = text.replace(/@import\s+(?:url\s*\(\s*['"]?|['"])[^"'\s]+(?:['"]?\s*\)|['"])\s*([\w\s\(\)\d\:,\-]*);/g, function(e) {
+        temp += e; return '';
+    });
+    text = temp + text;
+    
+    // Add images
+    return text.replace(new RegExp(Wikifier.imageFormatter.lookahead, "gim"), function(m,p1,p2,p3,src) {
+        for (var i = 0; i < imgPassages.length; i++) {
+            if (imgPassages[i].title == src) {
+                src = imgPassages[i].text;
+                break;
+            }
+        }
+        return "url(" + src + ")"
+    });
+}
+
+function setTransitionCSS(styleText) {
+    styleText = alterCSS(styleText);
+    var style = document.getElementById("transitionCSS");
+    style.styleSheet ? (style.styleSheet.cssText = styleText) : (style.innerHTML = styleText);
+}
+
+function throwError(a, b, tooltip) {
+    if (a) {
+        var elem = insertElement(a, "span", null, "marked", b);
+        tooltip && elem.setAttribute("title", tooltip);
+    } else {
+        alert("Regrettably, this " + tale.identity() + "'s code just ran into a problem:\n" + b + ".\n"+softErrorMessage);
+    }
+}
+Math.easeInOut = function (a) {
+    return (1 - ((Math.cos(a * Math.PI) + 1) / 2))
+};
+String.prototype.readMacroParams = function (keepquotes) {
+    var exec, re = /(?:\s*)(?:(?:"([^"]*)")|(?:'([^']*)')|(?:\[\[((?:[^\]]|\](?!\]))*)\]\])|([^"'\s]\S*))/mg,
+        params = [];
+    do {
+        var val;
+        exec = re.exec(this);
+        if (exec) {
+            if (exec[1]) {
+                val = exec[1];
+                keepquotes && (val = '"' + val + '"');
+            } else if (exec[2]) {
+                val = exec[2];
+                keepquotes && (val = "'" + val + "'");
+            } else if (exec[3]) {
+                val = exec[3];
+                keepquotes && (val = '"' + val.replace('"','\\"') + '"');
+            } else if (exec[4]) {
+                val = exec[4];
+            }
+            val && params.push(val);
+        }
+    } while (exec);
+    return params
+};
+String.prototype.readBracketedList = function () {
+    var c, b = "\\[\\[([^\\]]+)\\]\\]",
+        a = "[^\\s$]+",
+        e = "(?:" + b + ")|(" + a + ")",
+        d = new RegExp(e, "mg"),
+        f = [];
+    do {
+        c = d.exec(this);
+        if (c) {
+            if (c[1]) {
+                f.push(c[1])
+            } else {
+                if (c[2]) {
+                    f.push(c[2])
+                }
+            }
+        }
+    } while (c);
+    return (f)
+};
+
+function rot13(s) {
+  return s.replace(/[a-zA-Z]/g, function(c) {
+    return String.fromCharCode((c<="Z" ? 90 : 122) >= (c=c.charCodeAt()+13) ? c : c-26);
+  });
+}
+
+/*
+**
+** Polyfills
+**
+*/
+
+Object.create || (function() {
+    var F = function(){};
+    Object.create = function (o) {
+        if (typeof o != 'object') throw TypeError();
+        F.prototype = o;
+        return new F();
+    };
+})();
+String.prototype.trim || (String.prototype.trim = function () {
+    return this.replace(/^\s\s*/, "").replace(/\s\s*$/, "")
+});
+Array.isArray || (Array.isArray = function(arg) {
+    return Object.prototype.toString.call(arg) === '[object Array]';
+});
+Array.prototype.indexOf || (Array.prototype.indexOf = function (b, d) {
+    d = (d == null) ? 0 : d;
+    var a = this.length;
+    for (var c = d; c < a; c++) {
+        if (this[c] == b) {
+            return c
+        }
+    }
+    return -1
+});
+Array.prototype.forEach || (Array.prototype.forEach=function(fun){if(this==null){throw TypeError()}var t=Object(this);var len=+t.length;if(typeof fun!="function"){throw TypeError()}var thisArg=arguments.length>=2?arguments[1]:void 0;for(var i=0;i<len;i++){if(i in t){fun.call(thisArg,t[i],i,t)}}});
+
+/* btoa/atob polyfill by github.com/davidchambers */
+(function(){function t(t){this.message=t}var e=window,r="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";t.prototype=Error(),t.prototype.name="InvalidCharacterError",e.btoa||(e.btoa=function(e){for(var o,n,a=0,i=r,c="";e.charAt(0|a)||(i="=",a%1);c+=i.charAt(63&o>>8-8*(a%1))){if(n=e.charCodeAt(a+=.75),n>255)throw new t();o=o<<8|n}return c}),e.atob||(e.atob=function(e){if(e=e.replace(/=+$/,""),1==e.length%4)throw new t();for(var o,n,a=0,i=0,c="";n=e.charAt(i++);~n&&(o=a%4?64*o+n:n,a++%4)?c+=String.fromCharCode(255&o>>(6&-2*a)):0)n=r.indexOf(n);return c})})();
+
+/* Polyfill for fade transition */
+var hasTransition = 'transition' in document.documentElement.style || '-webkit-transition' in document.documentElement.style;
+
+function fade(f, c) {
+    var h;
+    var e = f.cloneNode(true);
+    var g = (c.fade == "in") ? 1 : -1;
+    f.parentNode.replaceChild(e, f);
+    if (c.fade == "in") {
+        h = 0;
+        e.style.visibility = "visible"
+    } else {
+        h = 1
+    }
+    b(e, h);
+    var a = window.setInterval(d, 25);
+
+    function d() {
+        h += 0.05 * g;
+        b(e, Math.easeInOut(h));
+        if (((g == 1) && (h >= 1)) || ((g == -1) && (h <= 0))) {
+            f.style.visibility = (c.fade == "in") ? "visible" : "hidden";
+            if (e.parentNode) {
+                e.parentNode.replaceChild(f, e);
+            }
+            window.clearInterval(a);
+            if (c.onComplete) {
+                c.onComplete.call(f)
+            }
+        }
+    }
+
+    function b(k, j) {
+        var l = Math.floor(j * 100);
+        k.style.zoom = 1;
+        k.style.filter = "alpha(opacity=" + l + ")";
+        k.style.opacity = j
+    }
+}
+
+/*
+**
+** History object
+**
+*/
+
+function History() {
+    this.history = [{
+        passage: null,
+        variables: {}
+    }]
+    // Unique identifier for this game session
+    this.id = new Date().getTime()+'';
+    // URL of the bookmark link
+    this.hash = '';
+}
+
+History.prototype.encodeHistory = function(b, noVars) {
+    var ret = ".", vars, type, hist = this.history[b],
+        d = this.history[b+1] ? delta(this.history[b+1].variables, hist.variables) : hist.variables;
+    
+    function vtob(val) {
+        try {
+            return window.btoa(unescape(encodeURIComponent(JSON.stringify(decompile(val)))));
+        } catch(e) {
+            return "0";
+        }
+    }
+    
+    if (!hist.passage || hist.passage.id == null) {
+        return ""
+    }
+    ret += hist.passage.id.toString(36);
+    if (noVars) {
+        return ret;
+    }
+    for (vars in d) {
+        type = typeof d[vars];
+        if (type != "undefined") {
+            ret += "$" + vtob(vars) + "," + vtob(d[vars]);
+        }
+    }
+    for (vars in hist.linkVars) {
+        type = typeof hist.linkVars[vars];
+        if (type != "function" && type != "undefined") {
+            ret += "[" + vtob(vars) + "," + vtob(hist.linkVars[vars]);
+        }
+    }
+    return ret
+};
+
+History.decodeHistory = function(str, prev) {
+    var name, splits, variable, c, d,
+        ret = { variables: clone(prev.variables) || {} },
+        match = /([a-z0-9]+)((?:\$[A-Za-z0-9\+\/=]+,[A-Za-z0-9\+\/=]+)*)((?:\[[A-Za-z0-9\+\/=]+,[A-Za-z0-9\+\/=]+)*)/g.exec(str);
+    
+    function btov(str) {
+        try {
+            return recompile(JSON.parse(decodeURIComponent(escape(window.atob(str)))));
+        } catch(e) {
+            return 0;
+        }
+    }
+    if (match) {
+        name = parseInt(match[1], 36);
+        if (!tale.has(name)) {
+            return false
+        }
+        if (match[2]) {
+            ret.variables || (ret.variables = {});
+            splits = match[2].split('$');
+            for (c = 0; c < splits.length; c++) {
+                variable = splits[c].split(",");
+                d = btov(variable[0]);
+                if (d) {
+                    ret.variables[d]=btov(variable[1]);
+                }
+            }
+        }
+        if (match[3]) {
+            ret.linkVars || (ret.linkVars = {});
+            splits = match[3].split('[');
+            for (c = 0; c < splits.length; c++) {
+                variable = splits[c].split(",");
+                d = btov(variable[0]);
+                if (d) {
+                    ret.linkVars[d]=btov(variable[1]);
+                }
+            }
+        }
+        ret.passage = tale.get(name);
+        return ret;
+    }
+};
+
+History.prototype.save = function() {
+    var hist, b, a = "";
+
+    for (b = this.history.length - 1; b >= 0; b--) {
+        hist = this.history[b];
+        if (!hist) {
+            break;
+        }
+        a += this.encodeHistory(b);
+    }
+    return "#" + a
+};
+
+History.prototype.restore = function () {
+    var a, b, c, vars;
+
+    try {
+        if (!window.location.hash || (window.location.hash == "#")) {
+            if (testplay && testplay !== "Start") {
+                if (tale.has("StoryInit")) {
+                    new Wikifier(insertElement(null, "span"), tale.get("StoryInit").text);
+                }
+                this.display(testplay, null, 'quietly');
+                return true
+            }
+            return false
+        }
+        if (window.location.hash.substr(0, 2) == '#!') {
+            c = window.location.hash.substr(2).split('_').join(' ');
+            this.display(c, null, 'quietly');
+            return true
+        }
+        a = window.location.hash.replace("#", "").split(".");
+        for (b = 0; b < a.length; b++) {
+            vars = History.decodeHistory(a[b], vars || {});
+            if (vars) {
+                if (b == a.length - 1) {
+                    vars.variables = clone(this.history[0].variables);
+                    for (c in this.history[0].linkVars) {
+                        vars.variables[c] = clone(this.history[0].linkVars[c]);
+                    }
+                    this.history.unshift(vars);
+                    this.display(vars.passage.title, null, "back");
+                }
+                else {
+                    this.history.unshift(vars);
+                }
+            }
+        }
+        return true
+    } catch (d) {
+        return false
+    }
+};
+
+History.prototype.saveVariables = function(c, el, callback) {
+
+    if (typeof callback == "function") {
+        callback.call(el);
+    }
+
+    this.history.unshift({
+        passage: c,
+        variables: clone(this.history[0].variables)
+    });
+};
+var restart = History.prototype.restart = function () {
+    if (typeof window.history.replaceState == "function") {
+        (typeof this.pushState == "function") && this.pushState(true, window.location.href.replace(/#.*$/,''));
+        window.location.reload()
+    }
+    else {
+        window.location.hash = "";
+    }
+};
+
+/*
+**
+** Macros
+**
+*/
+
+var version = {
+    major: 4,
+    minor: 3,
+    revision: 0,
+    date: new Date("2014"),
+    extensions: {}
+};
+var testplay, tale, state, prerender = {}, postrender = {}, macros = window.macros = {};
+
+version.extensions.displayMacro = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros.display = {
+    // Used by parameter() and parameterValue()
+    parameters: [],
+    handler: function (place, macroName, params, parser) {
+        var t, j, output, oldDisplayParams, name = parser.fullArgs();
+        
+        if (macroName != "display") {
+            output = macroName;
+            // Shorthand displays can have parameters
+            params = parser.fullMatch().replace(/^\S*|>>$/g,'').readMacroParams(true);
+            // The above line recreates params, with the quotes.
+            try {
+                for(j=0; j < params.length; j++) {
+                    params[j] = internalEval(Wikifier.parse(params[j]));
+                }
+            } catch (e) {
+                throwError(place, parser.fullMatch() + " bad argument: " + params[j], parser.fullMatch());
+                return
+            }
+        }
+        else {
+            try {
+                output = internalEval(name);
+            }
+            catch(e) {
+            }
+            if (output == null) {
+                // Last-ditch attempt
+                if (tale.has(name)) {
+                    output = name;
+                }
+            }
+        }
+        if (!output) {
+            throwError(place, '<<' + macroName + '>>: "' +name + "\" did not evaluate to a passage name", parser.fullMatch());
+        } else if (!tale.has(output+"")) {
+            throwError(place, '<<' + macroName + ">>: The \"" + output + "\" passage does not exist", parser.fullMatch());
+        } else {
+            oldDisplayParams = this.parameters;
+            this.parameters = params;
+            t = tale.get(output+"");
+            if (t.tags.indexOf("script") > -1) {
+                scriptEval(t);
+            }
+            else {
+                new Wikifier(place, t.processText());
+            }
+            this.parameters = oldDisplayParams; 
+        }
+    }
+};
+
+version.extensions.actionsMacro = {
+    major: 1,
+    minor: 2,
+    revision: 0
+};
+macros.actions = {
+    handler: function (a, f, g) {
+        var v = state.history[0].variables, e = insertElement(a, "ul");
+        if (!v["actions clicked"]) {
+            v["actions clicked"] = {}
+        }
+        for (var b = 0; b < g.length; b++) {
+            if (v["actions clicked"][g[b]]) {
+                continue
+            }
+            var d = insertElement(e, "li");
+            var c = Wikifier.createInternalLink(d, g[b], (function(link) {
+                return function() { state.history[0].variables["actions clicked"][link] = true; }
+            }(g[b])));
+            insertText(c, g[b]);
+        }
+    }
+};
+version.extensions.printMacro = {
+    major: 1,
+    minor: 1,
+    revision: 1
+};
+macros.print = {
+    handler: function (place, macroName, params, parser) {
+        var args = parser.fullArgs(macroName != "print"), output;
+        try {
+            // See comment within macros.display
+            output = internalEval(args);
+            if (output != null && (typeof output != "number" || !isNaN(output))) {
+                new Wikifier(place, ''+output);
+            }
+        } catch (e) {
+            throwError(place, "<<print>> bad expression: " + params.join(' '), parser.fullMatch());
+        }
+    }
+};
+version.extensions.setMacro = {
+    major: 1,
+    minor: 1,
+    revision: 0
+};
+macros.set = {
+    handler: function (a, b, c, parser) {
+        macros.set.run(a, parser.fullArgs(), parser, c.join(' '))
+    },
+    run: function (a,expression, parser, original) {
+        try {
+            return internalEval(expression);
+        } catch (e) {
+            throwError(a, "bad expression: " + (original || expression), parser ? parser.fullMatch() : expression)
+        }
+    }
+};
+version.extensions.ifMacros = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros["if"] = {
+    handler: function (place, macroName, params, parser) {
+        var conditions = [],
+            clauses = [],
+            rawConds = [],
+            srcOffset = parser.source.indexOf(">>", parser.matchStart) + 2,
+            src = parser.source.slice(srcOffset),
+            endPos = -1,
+            rawCond = params.join(' '),
+            currentCond = parser.fullArgs(),
+            currentClause = "",
+            t = 0,
+            nesting = 0,
+            i = 0;
+        
+        for (; i < src.length; i++) {
+            if ((src.substr(i, 6) == "<<else") && !nesting) {
+                rawConds.push(rawCond);
+                conditions.push(currentCond.trim());
+                clauses.push(currentClause);
+                currentClause="";
+                t = src.indexOf(">>",i+6);
+                if(src.substr(i+6,4)==" if " || src.substr(i+6,3)=="if ") {
+                    rawCond = src.slice(i+9,t);
+                    currentCond = Wikifier.parse(rawCond);
+                }
+                else {
+                    rawCond = "";
+                    currentCond = "true";
+                }
+                i = t+2;
+            }
+            if (src.substr(i, 5) == "<<if ") {
+                nesting++;
+            }
+            if (src.substr(i, 9) == "<<endif>>") {
+                nesting--;
+                if (nesting < 0) {
+                    endPos = srcOffset + i + 9;
+                    rawConds.push(rawCond);
+                    conditions.push(currentCond.trim());
+                    clauses.push(currentClause);
+                    break;
+                }
+            }
+            currentClause += src.charAt(i);
+        }
+
+        if (endPos != -1) {
+            parser.nextMatch = endPos;
+            try {
+                for(i=0;i<clauses.length;i++) {
+                    if (internalEval(conditions[i])) {
+                        new Wikifier(place, clauses[i]);
+                        break;
+                    }
+                }
+            } catch (e) {
+                throwError(place, "<<" + (i ? "else " : "") + "if>> bad condition: " + rawConds[i], !i ? parser.fullMatch()
+                    : "<<else if " + rawConds[i] + ">>");
+            }
+        } else {
+            throwError(place, "I can't find a matching <<endif>>", parser.fullMatch());
+        }
+    }
+};
+macros["else"] = macros.elseif = macros.endif = {
+    handler: function () {}
+};
+
+version.extensions.rememberMacro = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros.remember = {
+    handler: function (place, macroName, params, parser) {
+        var variable, value, re, match,
+            statement = params.join(" ");
+        macros.set.run(place, parser.fullArgs(), null, params.join(' '));
+        if (!window.localStorage) {
+            throwError(place, "<<remember>> can't be used "
+                + (window.location.protocol == "file:" ? " by local HTML files " : "") + " in this browser.",parser.fullMatch());
+            return;
+        }
+        re = new RegExp(Wikifier.textPrimitives.variable, "g");
+        while (match = re.exec(statement)) {
+            variable = match[1];
+            value = state.history[0].variables[variable];
+            try {
+                value = JSON.stringify(value);
+            } catch (e) {
+                throwError(place, "can't <<remember>> the variable $" + variable + " (" + (typeof value) + ")", parser.fullMatch());
+                return;
+            }
+            window.localStorage[this.prefix + variable] = value;
+        }
+    },
+    init: function () {
+        var i, variable, value;
+        this.prefix = "Twine." + tale.defaultTitle + ".";
+        for (i in window.localStorage) {
+            if (i.indexOf(this.prefix) == 0) {
+                variable = i.substr(this.prefix.length);
+                value = window.localStorage[i];
+                try {
+                    value = JSON.parse(value);
+                    state.history[0].variables[variable]=value;
+                } catch (e) {
+                }
+            }
+        }
+    },
+    expire: null,
+    prefix: null
+};
+
+version.extensions.forgetMacro = {
+    major: 1,
+    minor: 0,
+    revision: 0
+};
+macros.forget = {
+    handler: function (place, macroName, params) {
+        var re, match, variable,
+            statement = params.join(" ");
+        re = new RegExp(Wikifier.textPrimitives.variable, "g");
+        while (match = re.exec(statement)) {
+            variable = match[1] + ""
+            delete state.history[0].variables[variable];
+            delete window.localStorage[macros.remember.prefix + variable];
+        }
+    }
+};
+            
+version.extensions.SilentlyMacro = {
+    major: 1,
+    minor: 1,
+    revision: 0
+};
+macros.nobr = macros.silently = {
+    handler: function (place, macroName, f, parser) {
+        var i, h = insertElement(null, 'div'),
+            k = parser.source.indexOf('>>', parser.matchStart) + 2,
+            a = parser.source.slice(k),
+            d = -1,
+            c = '',
+            l = 0;
+        for (i = 0; i < a.length; i++) {
+            if (a.substr(i, macroName.length+7) == '<<end' + macroName + '>>') {
+                if (l == 0) {
+                    d = k + i + macroName.length+7;
+                    break;
+                } else {
+                    l--;
+                }
+            } else if (a.substr(i, macroName.length+4) == '<<' + macroName + '>>') {
+                l++;
+            }
+            if (macroName == "nobr" && a.charAt(i) == '\n') {
+                c += "\u200c"; // Zero-width space
+            }
+            else {
+                c += a.charAt(i);
+            }
+        }
+        if (d != -1) {
+            new Wikifier(macroName == "nobr" ? place : h, c);
+            parser.nextMatch = d;
+        } else {
+            throwError(place, "can't find matching <<end" + macroName+">>", parser.fullMatch());
+        }
+    }
+};
+macros.endsilently = {
+    handler: function () {}
+};
+
+version.extensions.choiceMacro = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros.choice = {
+    callback: function() {
+        var i, other, passage = findPassageParent(this);
+        
+        if (passage) {
+            other = passage.querySelectorAll(".choice");
+            for (i = 0; i < other.length; i++) {
+                other[i].outerHTML = "<span class=disabled>" + other[i].innerHTML + "</span>";
+            }
+            state.history[0].variables["choice clicked"][passage.id.replace(/\|[^\]]*$/,'')] = true;
+        }
+    },
+    handler: function (A, C, D, parser) {
+        var link, id, match,
+            text = D[1] || D[0].split("|")[0],
+            passage = findPassageParent(A);
+        // Get ID of the "choice clicked" entry
+        if (!passage) {
+            throwError(A, "<<"+C+">> can't be used here.",parser.fullMatch());
+            return;
+        }
+        id = (passage && passage.id.replace(/\|[^\]]*$/,''));
+        if (id && (state.history[0].variables["choice clicked"] || 
+                (state.history[0].variables["choice clicked"] = {}))[id]) {
+            insertElement(A, "span", null, "disabled", text); 
+        }
+        else {
+            match = new RegExp(Wikifier.linkFormatter.lookahead).exec(parser.fullMatch());
+            
+            if (match) {
+                link = Wikifier.linkFormatter.makeLink(A,match,this.callback);
+            }
+            else {
+                link = Wikifier.linkFormatter.makeLink(A,[0,text,D[0]],this.callback);
+            }
+            link.className += " " + C;
+        }
+    }
+};
+
+version.extensions.backMacro = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros.back = {
+    labeltext: '&#171; back',
+    handler: function (a, b, e, parser) {
+        var labelParam, c, el,
+            labeltouse = this.labeltext,
+            steps = 1,
+            stepsParam = e.indexOf("steps"),
+            stepsParam2 = "";
+        // Steps parameter
+        if(stepsParam > 0) {
+            stepsParam2 = e[stepsParam - 1];
+            if(stepsParam2[0] == '$') {
+                try {
+                    stepsParam2 = internalEval(Wikifier.parse(stepsParam2));
+                }
+                catch(r) {
+                    throwError(a, parser.fullMatch() + " bad expression: " + r.message, parser.fullMatch())
+                    return;
+                }
+            }
+            // Previously, trying to go back more steps than were present in the
+            // history would silently revert to just 1 step. 
+            // Instead, let's just go back to the start.
+            steps = +stepsParam2;
+            if(steps >= state.history.length - 1) {
+                steps = state.history.length - 2;
+            }
+            e.splice(stepsParam - 1, 2);
+        }
+        // Label parameter
+        labelParam = e.indexOf("label");
+        if(labelParam > -1) {
+            if(!e[labelParam + 1]) {
+                throwError(a, parser.fullMatch() + ": " + e[labelParam] + ' keyword needs an additional label parameter', parser.fullMatch());
+                return;
+            }
+            labeltouse = e[labelParam + 1];
+            e.splice(labelParam, 2);
+        }
+        // What's left is the passage name parameter
+        if(stepsParam <= 0) {
+            if(e[0]) {
+                if(e[0].charAt(0) == '$') {
+                    try {
+                        e = internalEval(Wikifier.parse(e[0]));
+                    }
+                    catch(r) {
+                        throwError(a, parser.fullMatch() + " bad expression: " + r.message, parser.fullMatch())
+                        return;
+                    }
+                }
+                else {
+                    e = e[0];
+                }
+                if(!tale.has(e)) {
+                    throwError(a, "The \"" + e + "\" passage does not exist",parser.fullMatch());
+                    return;
+                }
+                for(c = 0; c < state.history.length; c++) {
+                    if(state.history[c].passage.title == e) {
+                        steps = c;
+                        break;
+                    }
+                }
+            }
+        }
+        el = document.createElement("a");
+        el.className = b;
+        addClickHandler(el, (function(b) { return function () {
+            return macros.back.onclick(b == "back", steps, el)
+        }}(b)));
+        el.innerHTML = labeltouse;
+        a.appendChild(el);
+    }
+};
+
+version.extensions.returnMacro = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros["return"] = {
+  labeltext: '&#171; return',
+  handler: function(a,b,e) { 
+    macros.back.handler.call(this,a,b,e);
+  }
+};
+
+version.extensions.textInputMacro = {
+    major: 2,
+    minor: 0,
+    revision: 0
+};
+macros.checkbox = macros.radio = macros.textinput = {
+    handler: function (A, C, D, parser) {
+        var match,
+            class_ = C.replace('input','Input'),
+            q = A.querySelectorAll('input'),
+            id = class_ + "|" + ((q && q.length) || 0);
+            input = insertElement(null, 'input', id, class_);
+        
+        input.name=D[0];
+        input.type=C.replace('input','');
+        // IE 8 support - delay insertion until now
+        A.appendChild(input);
+        
+        if (C == "textinput" && D[1]) {
+            match = new RegExp(Wikifier.linkFormatter.lookahead).exec(parser.fullMatch());
+            
+            if (match) {
+                Wikifier.linkFormatter.makeLink(A,match, macros.button.callback, 'button');
+            }
+            else {
+                Wikifier.linkFormatter.makeLink(A,[0,(D[2] || D[1]),D[1]], macros.button.callback, 'button');
+            }
+        }
+        else if ((C == "radio" || C == "checkbox") && D[1]) {
+            input.value = D[1];
+            insertElement(A, 'label','', '', D[1]).setAttribute('for',id);
+            if (D[2]) {
+                insertElement(A,'br');
+                D.splice(1,1);
+                macros[C].handler(A,C,D)
+            }
+        }
+    }
+};
+
+version.extensions.buttonMacro = {
+    major: 1,
+    minor: 0,
+    revision: 0
+};
+macros.button = {
+    callback: function() {
+        var el = findPassageParent(this);
+        if (el) {
+            var inputs = el.querySelectorAll("input");
+            for (i = 0; i < inputs.length; i++) {
+                if (inputs[i].type!="checkbox" && (inputs[i].type!="radio" || inputs[i].checked)) {
+                    macros.set.run(null, Wikifier.parse(inputs[i].name+' = "'+inputs[i].value.replace(/"/g,'\\"')+'"'));
+                }
+                else if (inputs[i].type=="checkbox" && inputs[i].checked) {
+                    macros.set.run(null, Wikifier.parse(
+                        inputs[i].name+' = [].concat('+inputs[i].name+' || []);'));
+                    macros.set.run(null, Wikifier.parse(
+                        inputs[i].name+'.push("'+inputs[i].value.replace(/"/g,'\\"')+'")'));
+                }
+            }
+        }
+    },
+    handler: function (A, C, D, parser) {
+        var link,
+            match = new RegExp(Wikifier.linkFormatter.lookahead).exec(parser.fullMatch());
+        
+        if (match) {
+            Wikifier.linkFormatter.makeLink(A, match, this.callback, 'button');
+        }
+        else {
+            Wikifier.linkFormatter.makeLink(A,[0,D[1] || D[0], D[0]], this.callback, 'button');
+        }
+    }
+};
+
+/*
+**
+** Passage object
+**
+*/
+
+function Passage(c, b, a, ofunc) {
+    var t;
+    if (!this || this.constructor != Passage) {
+        throw new ReferenceError("passage() must be in lowercase");
+    }
+    this.title = c;
+    ofunc = typeof ofunc == 'function' && ofunc;
+    if (b) {
+        this.id = a;
+        // Load tags
+        this.tags = b.getAttribute("tags");
+        if (typeof this.tags == "string") {
+            if (ofunc) {
+                this.tags = ofunc(this.tags);
+            }
+            this.tags = this.tags.readBracketedList();
+        } else this.tags = [];
+        // Load text
+        t = b.firstChild ? b.firstChild.nodeValue : "";
+        if (ofunc && !this.isImage()) {
+            this.text = ofunc(Passage.unescapeLineBreaks(t));
+        } else {
+            this.text = Passage.unescapeLineBreaks(t);
+        }
+        // Preload linked images
+        if (!this.isImage()) {
+            this.preloadImages();
+        }
+        // Check for the .char selector, or the [data-char] selector
+        // False positives aren't a big issue.
+        if (/\.char\b|\[data\-char\b/.exec(this.text) && Wikifier.charSpanFormatter) {
+            Wikifier.formatters.push(Wikifier.charSpanFormatter);
+            delete Wikifier.charSpanFormatter;
+        }
+    } else {
+        this.text = '@@This passage does not exist: ' + c + '@@';
+        this.tags = [];
+    }
+}
+Passage.prototype.isImage = function() {
+    return !!~(this.tags.indexOf("Twine.image"));
+};
+Passage.prototype.preloadImages = function() {
+    // Don't preload URLs containing '$' - suspect that they are variables.
+    var u = "\\s*['\"]?([^\"'$]+\\.(jpe?g|a?png|gif|bmp|webp|svg))['\"]?\\s*",
+        k = function(c, e) {
+            var i,d;
+            do {
+                d = c.exec(this.text);
+                if(d) {
+                    i = new Image();
+                    i.src = d[e];
+                }
+            } while (d);
+            return k;
+        };
+    k.call(this, new RegExp(Wikifier.imageFormatter.lookahead.replace("[^\\[\\]\\|]+",u), "mg"), 4)
+        .call(this, new RegExp("url\\s*\\(" + u + "\\)", "mig"), 1)
+        .call(this, new RegExp("src\\s*=" + u, "mig"), 1);
+};
+
+Passage.unescapeLineBreaks = function (a) {
+    if (a && typeof a == "string") {
+        return a.replace(/\\n/mg, "\n").replace(/\\t/mg, "\t").replace(/\\s/mg, "\\").replace(/\\/mg, "\\").replace(/\r/mg, "")
+    } else {
+        return ""
+    }
+};
+Passage.prototype.setTags = function(b) {
+    var t = this.tags != null && this.tags.length ? this.tags.join(' ') : "";
+    if (t) {
+        b.setAttribute('data-tags', this.tags.join(' '));
+    }
+    document.body.setAttribute("data-tags", t);
+};
+Passage.prototype.processText = function() {
+    var ret = this.text;
+    if (~this.tags.indexOf("nobr")) {
+        ret = ret.replace(/\n/g,"\u200c");
+    }
+    if (this.isImage()) {
+        ret = "[img[" + ret + "]]"
+    }
+    return ret;
+};
+
+/*
+**
+** Tale object
+**
+*/
+
+function Tale() {
+    var a,b,c,lines,i,kv,nsc,isImage,
+        settings = this.storysettings = {
+            lookup: function(a, dfault) {
+                // The two runtime settings (undo and bookmark) default to true.
+                if (!(a in this)) return dfault;
+                return (this[a]+"") != "off";
+            }
+        },
+        HTMLtitle = document.querySelector('title');
+        tiddlerTitle = '';
+    this.defaultTitle = (HTMLtitle && (HTMLtitle.textContent || HTMLtitle.innerText)) || "fade__image";
+    this.passages = {};
+    //Look for and load the StorySettings
+    if (document.normalize) document.normalize();
+    a = document.getElementById("storeArea").children;
+    for (b = 0; b < a.length; b++) {
+        c = a[b];
+        if (c.getAttribute && c.getAttribute("tiddler") == 'StorySettings') {
+            lines = new Passage('StorySettings', c, 0, null, null).text.split('\n');
+            for (i in lines) {
+                if (typeof lines[i] == "string" && lines[i].indexOf(':') > -1) {
+                    kv = lines[i].toLowerCase().split(':');
+                    kv[0] = kv[0].replace(/^\s+|\s+$/g, '');
+                    kv[1] = kv[1].replace(/^\s+|\s+$/g, '');
+                    if (kv[0] != "lookup") {
+                        settings[kv[0]] = kv[1];
+                    }
+                }
+            }
+        }
+    }
+    //Load in the passages
+    if (settings.obfuscate == 'rot13') {
+        for (b = 0; b < a.length; b++) {
+            c = a[b];
+            if (c.getAttribute && (tiddlerTitle = c.getAttribute("tiddler"))) {
+                isImage = (c.getAttribute("tags")+"").indexOf("Twine.image")>-1;
+                if (tiddlerTitle != 'StorySettings' && !isImage) 
+                    tiddlerTitle = rot13(tiddlerTitle);
+                this.passages[tiddlerTitle] = new Passage(tiddlerTitle, c, b+1, !isImage && rot13);
+            }
+        }
+    } else {
+        for (b = 0; b < a.length; b++) {
+            c = a[b];
+            if (c.getAttribute && (tiddlerTitle = c.getAttribute("tiddler"))) {
+                this.passages[tiddlerTitle] = new Passage(tiddlerTitle, c, b, null, null)
+            }
+        }
+    }
+}
+Tale.prototype.has = function (a) {
+    if (typeof a == "string") {
+        return (this.passages[a] != null)
+    } else {
+        for (var i in this.passages) {
+            if (this.passages[i].id == a) {
+                return true
+            }
+        }
+        return false
+    }
+};
+Tale.prototype.get = function (a) {
+    if (typeof a == "string") {
+        return this.passages[a] || new Passage(a)
+    } else {
+        for (var i in this.passages) {
+            if (this.passages[i].id == a) {
+                return this.passages[i]
+            }
+        }
+    }
+};
+Tale.prototype.lookup = function (h, g, a) {
+    var d = [];
+    for (var c in this.passages) {
+        var f = this.passages[c];
+        for (var b = 0; b < f[h].length; b++) {
+            if (f[h][b] == g) {
+                d.push(f)
+            }
+        }
+    }
+    if (!a) {
+        a = "title"
+    }
+    d.sort(function (k, j) {
+        if (k[a] == j[a]) {
+            return (0)
+        } else {
+            return (k[a] < j[a]) ? -1 : +1
+        }
+    });
+    return d
+};
+Tale.prototype.canUndo = function() {
+    return this.storysettings.lookup('undo',true);
+};
+Tale.prototype.identity = function () {
+    var meta = document.querySelector("meta[name='identity']"),
+        identity = meta ? meta.getAttribute("content") : "story";
+    
+    return (Tale.prototype.identity = function() {
+        return identity;
+    })();
+};
+Tale.prototype.forEachStylesheet = function(tags, callback) {
+    var passage, i;
+    tags = tags || [];
+    
+    if (typeof callback != "function")
+        return;
+    for (passage in this.passages) {
+        passage = tale.passages[passage];
+        if (passage && ~passage.tags.indexOf("stylesheet")) {
+            for (i = 0; i < tags.length; i++) {
+                if (~passage.tags.indexOf(tags[i])) {
+                    callback(passage);
+                    break;
+                }
+            }
+        }
+    }
+};
+Tale.prototype.setPageElements = function() {
+    var storyTitle;
+    
+    setPageElement("storyTitle", "StoryTitle", this.defaultTitle);
+    storyTitle = document.getElementById("storyTitle");
+    document.title = this.title = (storyTitle && (storyTitle.textContent || storyTitle.innerText)) || this.defaultTitle;
+    
+    setPageElement("storySubtitle", "StorySubtitle", "");
+    if (tale.has("StoryAuthor")) {
+        setPageElement("titleSeparator", null, "\n");
+        setPageElement("storyAuthor", "StoryAuthor", "");
+    }
+    if (tale.has("StoryMenu")) {
+        document.getElementById("storyMenu").setAttribute("style","");
+        setPageElement("storyMenu", "StoryMenu", "");
+    }
+};
+
+/*
+**
+** Wikifier object
+**
+*/
+
+function Wikifier(place, source) {
+    this.source = source;
+    this.output = place;
+    this.nextMatch = 0;
+    this.assembleFormatterMatches(Wikifier.formatters);
+    this.subWikify(this.output);
+}
+
+Wikifier.textPrimitives = {
+    upperLetter: "[A-Z\u00c0-\u00de\u0150\u0170]",
+    lowerLetter: "[a-z\u00df-\u00ff_0-9\\-\u0151\u0171]",
+    anyLetter: "[A-Za-z\u00c0-\u00de\u00df-\u00ff_0-9\\-\u0150\u0170\u0151\u0171]"
+}
+Wikifier.textPrimitives.variable = "\\$((?:"+Wikifier.textPrimitives.anyLetter.replace("\\-", "")+"*"+
+    Wikifier.textPrimitives.anyLetter.replace("0-9\\-", "")+"+"+
+    Wikifier.textPrimitives.anyLetter.replace("\\-", "")+"*)+)";
+Wikifier.textPrimitives.unquoted = "(?=(?:[^\"'\\\\]*(?:\\\\.|'(?:[^'\\\\]*\\\\.)*[^'\\\\]*'|\"(?:[^\"\\\\]*\\\\.)*[^\"\\\\]*\"))*[^'\"]*$)";
+
+Wikifier.prototype.assembleFormatterMatches = function (formatters) {
+    this.formatters = [];
+    var pattern = [];
+
+    for (var n = 0; n < formatters.length; n++) {
+        pattern.push("(" + formatters[n].match + ")");
+        this.formatters.push(formatters[n]);
+    };
+
+    this.formatterRegExp = new RegExp(pattern.join("|"), "mg");
+};
+
+Wikifier.prototype.subWikify = function (output, terminator) {
+    // Temporarily replace the output pointer
+    var terminatorMatch, formatterMatch, oldOutput = this.output;
+    this.output = output;
+
+    // Prepare the terminator RegExp
+    var terminatorRegExp = terminator ? new RegExp("(" + terminator + ")", "mg") : null;
+    do {
+        // Prepare the RegExp match positions
+        this.formatterRegExp.lastIndex = this.nextMatch;
+
+        if (terminatorRegExp) terminatorRegExp.lastIndex = this.nextMatch;
+
+        // Get the first matches
+        formatterMatch = this.formatterRegExp.exec(this.source);
+        terminatorMatch = terminatorRegExp ? terminatorRegExp.exec(this.source) : null;
+
+        // Check for a terminator match
+        if (terminatorMatch && (!formatterMatch || terminatorMatch.index <= formatterMatch.index)) {
+            // Output any text before the match
+            if (terminatorMatch.index > this.nextMatch) this.outputText(this.output, this.nextMatch, terminatorMatch.index);
+
+            // Set the match parameters
+            this.matchStart = terminatorMatch.index;
+            this.matchLength = terminatorMatch[1].length;
+            this.matchText = terminatorMatch[1];
+            this.nextMatch = terminatorMatch.index + terminatorMatch[1].length;
+
+            // Restore the output pointer and exit
+            this.output = oldOutput;
+            return;
+        }
+        // Check for a formatter match
+        else if (formatterMatch) {
+            // Output any text before the match
+            if (formatterMatch.index > this.nextMatch) this.outputText(this.output, this.nextMatch, formatterMatch.index);
+
+            // Set the match parameters
+            this.matchStart = formatterMatch.index;
+            this.matchLength = formatterMatch[0].length;
+            this.matchText = formatterMatch[0];
+            this.nextMatch = this.formatterRegExp.lastIndex;
+
+            // Figure out which formatter matched
+            var matchingFormatter = -1;
+            for (var t = 1; t < formatterMatch.length; t++) {
+                if (formatterMatch[t]) {
+                    matchingFormatter = t - 1;
+                    break;
+                }
+            }
+
+            // Call the formatter
+            if (matchingFormatter != -1) { this.formatters[matchingFormatter].handler(this); }
+        }
+    }
+    while (terminatorMatch || formatterMatch);
+
+    // Output any text after the last match
+    if (this.nextMatch < this.source.length) {
+        this.outputText(this.output, this.nextMatch, this.source.length);
+        this.nextMatch = this.source.length;
+    }
+
+    // Restore the output pointer
+    this.output = oldOutput;
+};
+
+Wikifier.prototype.outputText = function (place, startPos, endPos) {
+    if (place) {
+        insertText(place, this.source.substring(startPos, endPos));
+    }
+};
+
+Wikifier.prototype.fullMatch = function() {
+    return this.source.slice(this.matchStart, this.source.indexOf('>>', this.matchStart)+2);
+};
+
+Wikifier.prototype.fullArgs = function (includeName) {
+    var source = this.source.replace(/\u200c/g," "),
+        endPos = this.nextMatch-2,
+        startPos = source.indexOf(includeName ? '<<' : ' ', this.matchStart);
+    if (!~startPos || !~endPos || endPos <= startPos) {
+        return "";
+    }
+    return Wikifier.parse(source.slice(startPos + (includeName ? 2 : 1), endPos).trim());
+};
+
+Wikifier.parse = function (input) {
+    var m, re, b = input, found = [],
+        g = Wikifier.textPrimitives.unquoted;
+    
+    function alter(from,to) {
+        b = b.replace(new RegExp(from+g,"gim"),to);
+        return alter;
+    }
+    // Extract all the variables, and set them to 0 if undefined.
+    re = new RegExp(Wikifier.textPrimitives.variable+g,"gi");
+    while (m = re.exec(input)) {
+        if (!~found.indexOf(m[0])) {
+            // This deliberately contains a 'null or undefined' check
+            b = m[0]+" == null && ("+m[0]+" = 0);"+b;
+            found.push(m[0]);
+        }
+    }
+    alter(Wikifier.textPrimitives.variable, "state.history[0].variables.$1")
+    // Old operators
+    ("\\beq\\b", " == ")
+    ("\\bneq\\b", " != ")
+    ("\\bgt\\b", " > ")
+    ("\\bgte\\b", " >= ")
+    ("\\blt\\b", " < ")
+    ("\\blte\\b", " <= ")
+    ("\\band\\b", " && ")
+    ("\\bor\\b", " || ")
+    ("\\bnot\\b", " ! ")
+    // New operators
+    ("\\bis\\b", " == ")
+    ("\\bto\\b", " = ");
+    return b
+};
+Wikifier.formatHelpers = {
+    charFormatHelper: function (a) {
+        var b = insertElement(a.output, this.element);
+        a.subWikify(b, this.terminator)
+    },
+    inlineCssHelper: function (w) {
+        var s, v, lookaheadMatch, gotMatch,
+            styles = [],
+            lookahead = Wikifier.styleByCharFormatter.lookahead,
+            lookaheadRegExp = new RegExp(lookahead, "mg"),
+            hadStyle = false,
+            unDash = function (str) {
+                var s = str.split("-");
+                if (s.length > 1) for (var t = 1; t < s.length; t++)
+                s[t] = s[t].substr(0, 1).toUpperCase() + s[t].substr(1);
+                return s.join("");
+            };
+        
+        styles.className = "";
+        do {
+            lookaheadRegExp.lastIndex = w.nextMatch;
+            lookaheadMatch = lookaheadRegExp.exec(w.source);
+            gotMatch = lookaheadMatch && lookaheadMatch.index == w.nextMatch;
+            if (gotMatch) {
+                hadStyle = true;
+                if (lookaheadMatch[5]) {
+                    styles.className += lookaheadMatch[5].replace(/\./g," ") + " ";
+                } else if (lookaheadMatch[1]) {
+                    s = unDash(lookaheadMatch[1]);
+                    v = lookaheadMatch[2];
+                } else {
+                    s = unDash(lookaheadMatch[3]);
+                    v = lookaheadMatch[4];
+                }
+                switch (s) {
+                case "bgcolor":
+                    s = "backgroundColor";
+                    break;
+                case "float":
+                    s = "cssFloat";
+                    break
+                }
+                styles.push({
+                    style: s,
+                    value: v
+                });
+                w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+            }
+        } while (gotMatch);
+        return styles;
+    },
+    monospacedByLineHelper: function (w) {
+        var lookaheadRegExp = new RegExp(this.lookahead, "mg");
+        lookaheadRegExp.lastIndex = w.matchStart;
+        var lookaheadMatch = lookaheadRegExp.exec(w.source);
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart) {
+            insertElement(w.output, "pre", null, null, lookaheadMatch[1]);
+            w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+        }
+    }
+};
+Wikifier.formatters = [
+{
+    name: "table",
+    match: "^\\|(?:[^\\n]*)\\|(?:[fhc]?)$",
+    lookahead: "^\\|([^\\n]*)\\|([fhc]?)$",
+    rowTerminator: "\\|(?:[fhc]?)$\\n?",
+    cellPattern: "(?:\\|([^\\n\\|]*)\\|)|(\\|[fhc]?$\\n?)",
+    cellTerminator: "(?:\\x20*)\\|",
+    rowTypes: {
+        "c": "caption",
+        "h": "thead",
+        "": "tbody",
+        "f": "tfoot"
+    },
+    handler: function (w) {
+        var rowContainer, rowElement,lookaheadMatch, matched,
+            table = insertElement(w.output, "table"),
+            lookaheadRegExp = new RegExp(this.lookahead, "mg"),
+            currRowType = null,
+            nextRowType,
+            prevColumns = [],
+            rowCount = 0;
+        w.nextMatch = w.matchStart;
+        do {
+            lookaheadRegExp.lastIndex = w.nextMatch;
+            lookaheadMatch = lookaheadRegExp.exec(w.source),
+            matched = lookaheadMatch && lookaheadMatch.index == w.nextMatch;
+            if (matched) {
+                nextRowType = lookaheadMatch[2];
+                if (nextRowType != currRowType) rowContainer = insertElement(table, this.rowTypes[nextRowType]);
+                currRowType = nextRowType;
+                if (currRowType == "c") {
+                    if (rowCount == 0) rowContainer.setAttribute("align", "top");
+                    else rowContainer.setAttribute("align", "bottom");
+                    w.nextMatch = w.nextMatch + 1;
+                    w.subWikify(rowContainer, this.rowTerminator);
+                } else {
+                    rowElement = insertElement(rowContainer, "tr");
+                    this.rowHandler(w, rowElement, prevColumns);
+                }
+                rowCount++;
+            }
+        } while (matched);
+    },
+    rowHandler: function (w, e, prevColumns) {
+        var cellMatch, matched, col = 0,
+        currColCount = 1,
+        cellRegExp = new RegExp(this.cellPattern, "mg");
+        
+        do {
+            cellRegExp.lastIndex = w.nextMatch;
+            cellMatch = cellRegExp.exec(w.source);
+            matched = cellMatch && cellMatch.index == w.nextMatch;
+            if (matched) {
+                if (cellMatch[1] == "~") {
+                    var last = prevColumns[col];
+                    if (last) {
+                        last.rowCount++;
+                        last.element.setAttribute("rowSpan", last.rowCount);
+                        last.element.setAttribute("rowspan", last.rowCount);
+                        last.element.valign = "center";
+                    }
+                    w.nextMatch = cellMatch.index + cellMatch[0].length - 1;
+                } else if (cellMatch[1] == ">") {
+                    currColCount++;
+                    w.nextMatch = cellMatch.index + cellMatch[0].length - 1;
+                } else if (cellMatch[2]) {
+                    w.nextMatch = cellMatch.index + cellMatch[0].length;
+                    break;
+                } else {
+                    var spaceLeft = false,
+                        spaceRight = false,
+                        lastColCount, lastColElement, styles, cell, t;
+                    w.nextMatch++;
+                    styles = Wikifier.formatHelpers.inlineCssHelper(w);
+                    while (w.source.substr(w.nextMatch, 1) == " ") {
+                        spaceLeft = true;
+                        w.nextMatch++;
+                    }
+                    if (w.source.substr(w.nextMatch, 1) == "!") {
+                        cell = insertElement(e, "th");
+                        w.nextMatch++;
+                    } else cell = insertElement(e, "td");
+                    prevColumns[col] = {
+                        rowCount: 1,
+                        element: cell
+                    };
+                    lastColCount = 1;
+                    lastColElement = cell;
+                    if (currColCount > 1) {
+                        cell.setAttribute("colSpan", currColCount);
+                        cell.setAttribute("colspan", currColCount);
+                        currColCount = 1;
+                    }
+                    for (t = 0; t < styles.length; t++)
+                    cell.style[styles[t].style] = styles[t].value;
+                    w.subWikify(cell, this.cellTerminator);
+                    if (w.matchText.substr(w.matchText.length - 2, 1) == " ") spaceRight = true;
+                    if (spaceLeft && spaceRight) cell.align = "center";
+                    else if (spaceLeft) cell.align = "right";
+                    else if (spaceRight) cell.align = "left";
+                    w.nextMatch = w.nextMatch - 1;
+                }
+                col++;
+            }
+        } while (matched);
+    }
+},
+{
+    name: "rule",
+    match: "^----$\\n?",
+    handler: function (w) {
+        insertElement(w.output, "hr");
+    }
+},
+{
+    name: "emdash",
+    match: "--",
+    becomes: String.fromCharCode(8212),
+    handler: function (a) {
+        insertElement(a.output, "span", null, "char", this.becomes).setAttribute("data-char","emdash");
+    }
+},
+{
+    name: "heading",
+    match: "^!{1,5}",
+    terminator: "\\n",
+    handler: function (w) {
+        var e = insertElement(w.output, "h" + w.matchLength);
+        w.subWikify(e, this.terminator);
+    }
+},
+{
+    name: "monospacedByLine",
+    match: "^\\{\\{\\{\\n",
+    lookahead: "^\\{\\{\\{\\n((?:^[^\\n]*\\n)+?)(^\\}\\}\\}$\\n?)",
+    handler: Wikifier.formatHelpers.monospacedByLineHelper
+},
+{
+    name: "quoteByBlock",
+    match: "^<<<\\n",
+    terminator: "^<<<\\n",
+    handler: function (w) {
+        var e = insertElement(w.output, "blockquote");
+        w.subWikify(e, this.terminator);
+    }
+},
+{
+    name: "list",
+    match: "^(?:(?:\\*+)|(?:#+))",
+    lookahead: "^(?:(\\*+)|(#+))",
+    terminator: "\\n",
+    handler: function (w) {
+        var newType, newLevel, t, len, bulletType, lookaheadMatch, matched,
+            lookaheadRegExp = new RegExp(this.lookahead, "mg"),
+            placeStack = [w.output],
+            currType = null,
+            currLevel = 0;
+            
+        w.nextMatch = w.matchStart;
+        do {
+            lookaheadRegExp.lastIndex = w.nextMatch;
+            lookaheadMatch = lookaheadRegExp.exec(w.source);
+            matched = lookaheadMatch && lookaheadMatch.index == w.nextMatch;
+            if (matched) {
+                newLevel = lookaheadMatch[0].length;
+                if (lookaheadMatch[1]) {
+                    bulletType = lookaheadMatch[1].slice(-1);
+                    newType = "ul";
+                }
+                else if (lookaheadMatch[2]) {
+                    newType = "ol";
+                }
+                w.nextMatch += newLevel;
+                if (newLevel > currLevel) {
+                    for (t = currLevel; t < newLevel; t++) {
+                        placeStack.push(insertElement(placeStack[placeStack.length - 1], newType));
+                    }
+                } else if (newLevel < currLevel) {
+                    for (t = currLevel; t > newLevel; t--)
+                        placeStack.pop();
+                } else if (newLevel == currLevel && newType != currType) {
+                    placeStack.pop();
+                    placeStack.push(insertElement(placeStack[placeStack.length - 1], newType));
+                }
+                currLevel = newLevel;
+                currType = newType;
+                t = insertElement(placeStack[placeStack.length - 1], "li");
+                // Currently unused
+                if (bulletType && bulletType != "*") {
+                    t.setAttribute("data-bullet", bulletType);
+                }
+                w.subWikify(t, this.terminator);
+            }
+        } while (matched);
+    }
+},
+(Wikifier.urlFormatter = {
+    name: "urlLink",
+    match: "(?:https?|mailto|javascript|ftp|data):[^\\s'\"]+(?:/|\\b)",
+    handler: function (w) {
+        var e = Wikifier.createExternalLink(w.output, w.matchText);
+        w.outputText(e, w.matchStart, w.nextMatch);
+    }
+}),
+(Wikifier.linkFormatter = {
+    name: "prettyLink",
+    match: "\\[\\[",
+    lookahead: "\\[\\[([^\\|]*?)(?:\\|(.*?))?\\](?:\\[(.*?)\])?\\]",
+    makeInternalOrExternal: function(out,title,callback,type) {
+        if (title && !tale.has(title) && (title.match(Wikifier.urlFormatter.match,"g") || ~title.search(/[\.\\\/#]/)))
+            return Wikifier.createExternalLink(out, title, callback, type); 
+        else
+            return Wikifier.createInternalLink(out, title, callback, type);
+    },
+    // This base callback executes the code in a setter 
+    makeCallback: function(code,callback) {
+        return function() {
+            macros.set.run(null, Wikifier.parse(code), null, code); 
+            typeof callback == "function" && callback.call(this);
+        }
+    },
+    makeLink: function(out, match, callback2, type) {
+        var link, title, callback;
+        if (match[3]) { // Code
+            callback = this.makeCallback(match[3],callback2);
+        }
+        else {
+            typeof callback2 == "function" && (callback = callback2);
+        }
+        title = Wikifier.parsePassageTitle(match[2] || match[1]);
+        link = this.makeInternalOrExternal(out,title,callback, type);
+        setPageElement(link, null, match[2] ? match[1] : title);
+        return link;
+    },
+    handler: function (w) {
+        var lookaheadRegExp = new RegExp(this.lookahead, "mg");
+        lookaheadRegExp.lastIndex = w.matchStart;
+        var lookaheadMatch = lookaheadRegExp.exec(w.source)
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart) {
+            this.makeLink(w.output, lookaheadMatch)
+            w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+        }
+    }
+}),
+(Wikifier.imageFormatter = {
+    name: "image",
+    match: "\\[(?:[<]{0,1})(?:[>]{0,1})[Ii][Mm][Gg]\\[",
+    lookahead: "\\[([<]?)(>?)img\\[(?:([^\\|\\]]+)\\|)?([^\\[\\]\\|]+)\\](?:\\[([^\\]]*)\\]?)?(\\])",
+    importedImage: function(img, passageName) {
+        var imgPassages, imgname;
+        // Try to parse it as a variable
+        try {
+            imgname = internalEval(Wikifier.parse(passageName));
+        }
+        catch(e) {
+        }
+        if (!imgname) {
+            imgname = passageName;
+        }
+        // Base64 passage transclusion
+        imgPassages = tale.lookup("tags", "Twine.image");
+        for (j = 0; j < imgPassages.length; j++) {
+            if (imgPassages[j].title == imgname) {
+                img.src = imgPassages[j].text;
+                return;
+            }
+        }
+        img.src = img.src || imgname;
+    },
+    handler: function (w) {
+        var e, img, j, lookaheadMatch,
+            lookaheadRegExp = new RegExp(this.lookahead, "mig");
+        lookaheadRegExp.lastIndex = w.matchStart;
+        lookaheadMatch = lookaheadRegExp.exec(w.source);
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart)
+        {
+            e = w.output, title = Wikifier.parsePassageTitle(lookaheadMatch[5])
+            if (title) {
+                e = Wikifier.linkFormatter.makeInternalOrExternal(w.output, title);
+            }
+            img = insertElement(e, "img");
+            if (lookaheadMatch[1]) img.align = "left";
+            else if (lookaheadMatch[2]) img.align = "right";
+            if (lookaheadMatch[3]) img.title = lookaheadMatch[3];
+            // Setup the image if it's referencing an image passage.
+            this.importedImage(img,lookaheadMatch[4]);
+            w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+        }
+    }
+}),
+{
+    name: "macro",
+    match: "<<",
+    lookahead: /<<([^>\s]+)(?:\s*)((?:\\.|'(?:[^'\\]*\\.)*[^'\\]*'|"(?:[^"\\]*\\.)*[^"\\]*"|[^'"\\>]|>(?!>))*)>>/mg,
+    handler: function (w) {
+        var lookaheadRegExp = new RegExp(this.lookahead);
+        lookaheadRegExp.lastIndex = w.matchStart;
+        var lookaheadMatch = lookaheadRegExp.exec(w.source.replace(/\u200c/g,'\n'));
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart && lookaheadMatch[1]) {
+            var params = lookaheadMatch[2].readMacroParams();
+            w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+            var name = lookaheadMatch[1];
+            try {
+                var macro = macros[name];
+                if (macro && typeof macro == "object" && macro.handler) {
+                    macro.handler(w.output, name, params, w);
+                }
+                // Variable?
+                else if (name[0] == '$') {
+                    macros.print.handler(w.output, name, [name].concat(params), w);
+                }
+                // Passage
+                else if (tale.has(name)) {
+                    macros.display.handler(w.output, name, [name].concat(params), w);
+                }
+                else throwError(w.output, 'No macro or passage called "' + name + '"', w.fullMatch());
+            } catch (e) {
+                throwError(w.output, 'Error executing macro ' + name + ': ' + e.toString(), w.fullMatch());
+            }
+        }
+    }
+},
+{
+    name: "html",
+    match: "<html>",
+    lookahead: "<html>((?:.|\\n)*?)</html>",
+    handler: function (w) {
+        var lookaheadRegExp = new RegExp(this.lookahead, "mg");
+        lookaheadRegExp.lastIndex = w.matchStart;
+        var lookaheadMatch = lookaheadRegExp.exec(w.source)
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart) {
+            var e = insertElement(w.output, "span");
+            e.innerHTML = lookaheadMatch[1];
+            w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+        }
+    }
+},
+{
+    name: "commentByBlock",
+    match: "/%",
+    lookahead: "/%((?:.|\\n)*?)%/",
+    handler: function (w) {
+        var lookaheadRegExp = new RegExp(this.lookahead, "mg");
+        lookaheadRegExp.lastIndex = w.matchStart;
+        var lookaheadMatch = lookaheadRegExp.exec(w.source)
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart) w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+    }
+},
+{
+    name: "boldByChar",
+    match: "''",
+    terminator: "''",
+    element: "strong",
+    handler: Wikifier.formatHelpers.charFormatHelper
+},
+{
+    name: "strikeByChar",
+    match: "==",
+    terminator: "==",
+    element: "strike",
+    handler: Wikifier.formatHelpers.charFormatHelper
+},
+{
+    name: "underlineByChar",
+    match: "__",
+    terminator: "__",
+    element: "u",
+    handler: Wikifier.formatHelpers.charFormatHelper
+},
+{
+    name: "italicByChar",
+    match: "//",
+    terminator: "//",
+    element: "em",
+    handler: Wikifier.formatHelpers.charFormatHelper
+},
+{
+    name: "subscriptByChar",
+    match: "~~",
+    terminator: "~~",
+    element: "sub",
+    handler: Wikifier.formatHelpers.charFormatHelper
+},
+{
+    name: "superscriptByChar",
+    match: "\\^\\^",
+    terminator: "\\^\\^",
+    element: "sup",
+    handler: Wikifier.formatHelpers.charFormatHelper
+},
+{
+    name: "monospacedByChar",
+    match: "\\{\\{\\{",
+    lookahead: "\\{\\{\\{((?:.|\\n)*?)\\}\\}\\}",
+    handler: function (w) {
+        var lookaheadRegExp = new RegExp(this.lookahead, "mg");
+        lookaheadRegExp.lastIndex = w.matchStart;
+        var lookaheadMatch = lookaheadRegExp.exec(w.source)
+        if (lookaheadMatch && lookaheadMatch.index == w.matchStart) {
+            var e = insertElement(w.output, "code", null, null, lookaheadMatch[1]);
+            w.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+        }
+    }
+},
+(Wikifier.styleByCharFormatter = {
+    name: "styleByChar",
+    match: "@@",
+    terminator: "@@",
+    lookahead: "(?:([^\\(@]+)\\(([^\\)\\|\\n]+)(?:\\):))|(?:([^\\.:@]+):([^;\\|\\n]+);)|(?:\\.([^;\\|\\n]+);)",
+    handler: function (w) {
+        var e = insertElement(w.output, "span", null, null, null);
+        var styles = Wikifier.formatHelpers.inlineCssHelper(w);
+        if (styles.length == 0) {
+            e.className = "marked";
+        }
+        else {
+            for (var t = 0; t < styles.length; t++) {
+                e.style[styles[t].style] = styles[t].value;
+            }
+            if (typeof styles.className == "string") {
+                e.className = styles.className; 
+            }
+        }
+        w.subWikify(e, this.terminator);
+    }
+}),
+{
+    name: "lineBreak",
+    match: "\\n",
+    handler: function (w) {
+        insertElement(w.output, "br");
+    }
+},
+{
+    name: "continuedLine",
+    match: "\\\\\\s*?\\n",
+    handler: function(a) {
+        a.nextMatch = a.matchStart+2;
+    }
+},
+{
+    name: "htmlCharacterReference",
+    match: "(?:(?:&#?[a-zA-Z0-9]{2,8};|.)(?:&#?(?:x0*(?:3[0-6][0-9a-fA-F]|1D[c-fC-F][0-9a-fA-F]|20[d-fD-F][0-9a-fA-F]|FE2[0-9a-fA-F])|0*(?:76[89]|7[7-9][0-9]|8[0-7][0-9]|761[6-9]|76[2-7][0-9]|84[0-3][0-9]|844[0-7]|6505[6-9]|6506[0-9]|6507[0-1]));)+|&#?[a-zA-Z0-9]{2,8};)",
+    handler: function(w)
+    {
+        var el = document.createElement("div");
+        el.innerHTML = w.matchText;
+        insertText(w.output, el.textContent);
+    }
+},
+{
+    name: "htmltag",
+    match: "<(?:\\/?[\\w\\-]+|[\\w\\-]+(?:(?:\\s+[\\w\\-]+(?:\\s*=\\s*(?:\\\".*?\\\"|'.*?'|[^'\\\">\\s]+))?)+\\s*|\\s*)\\/?)>",
+    tagname: "<(\\w+)",
+    voids: ["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"],
+    tableElems: ["table","thead","tbody","tfoot","th","tr","td","colgroup","col","caption","figcaption"],
+    cleanupTables: function (e) {
+        var i, name, elems = [].slice.call(e.children);
+        // Remove non-table child elements that aren't children of <td>s
+        for (i = 0; i < elems.length; i++) {
+            if (elems[i].tagName) {
+                name = elems[i].tagName.toLowerCase();
+                if (this.tableElems.indexOf(name)==-1) {
+                    elems[i].outerHTML = '';
+                }
+                else if (['col','caption','figcaption','td','th'].indexOf(name)==-1) {
+                    this.cleanupTables.call(this,elems[i]);
+                }
+            }
+        }
+    },
+    handler: function (a) {
+        var tmp, passage, setter, e, isvoid, isstyle, lookaheadRegExp, lookaheadMatch, lookahead,
+          re = new RegExp(this.tagname).exec(a.matchText),
+          tn = re && re[1] && re[1].toLowerCase();
+        if(tn && tn != "html") {
+            lookahead = "<\\/\\s*" + tn + "\\s*>";
+            isvoid = (this.voids.indexOf(tn) != -1);
+            isstyle = tn == "style" || tn == "script";
+            lookaheadRegExp = new RegExp(lookahead, "mg");
+            lookaheadRegExp.lastIndex = a.matchStart;
+            lookaheadMatch = lookaheadRegExp.exec(a.source);
+            if (lookaheadMatch || isvoid) {
+                if (isstyle) {
+                    e = document.createElement(tn);
+                    e.type = "text/css"; // IE8 compatibility
+                    tmp = a.source.slice(a.nextMatch, lookaheadMatch.index);
+                    e.styleSheet ? (e.styleSheet.cssText = tmp) : (e.innerHTML = tmp);
+                    a.nextMatch = lookaheadMatch.index + lookaheadMatch[0].length;
+                }
+                else {
+                    // Creating a loose <tr> element creates it wrapped inside a <tbody> element.
+                    e = document.createElement(a.output.tagName);
+                    e.innerHTML = a.matchText;
+                    while(e.firstChild) {
+                        e = e.firstChild;
+                    }
+                    if (!isvoid) {
+                        a.subWikify(e, lookahead);
+                    }
+                }
+                if (e.tagName.toLowerCase() == 'table') {
+                    this.cleanupTables.call(this,e);
+                }
+                // Special data-setter attribute
+                if (setter = e.getAttribute("data-setter")) {
+                    setter = Wikifier.linkFormatter.makeCallback(setter);
+                }
+                // Special data-passage attribute
+                if (passage = e.getAttribute("data-passage")) {
+                    if (tn != "img") { 
+                        addClickHandler(e, Wikifier.linkFunction(Wikifier.parsePassageTitle(passage), e, setter));
+                        if (tn == "area" || tn == "a") {
+                            e.setAttribute("href", "javascript:;");
+                        }
+                    }
+                    else {
+                        Wikifier.imageFormatter.importedImage(e, passage);
+                    }
+                }
+                a.output.appendChild(e);
+            } else {
+                throwError(a.output,"HTML tag '"+tn+"' wasn't closed.", a.matchText);
+            }
+        }
+    }
+}];
+// Optional - included if the ".char" selector appears anywhere in the story.
+Wikifier.charSpanFormatter = {
+    name: "char",
+    match: "[^\n]",
+    handler: function (a) {
+        // Line breaks do NOT get their own charspans
+        insertElement(a.output, "span", null, "char", a.matchText).setAttribute("data-char", a.matchText == " " ? "space" :
+            a.matchText == "\t" ? "tab" : a.matchText);
+    }
+};
+
+Wikifier.parsePassageTitle = function(title) {
+    if (title && !tale.has(title)) {
+        try {
+            title = (internalEval(this.parse(title)) || title)+"";
+        }
+        catch(e) {}
+    }
+    return title;
+};
+
+Wikifier.linkFunction = function(title, el, callback) {
+    return function() {
+        if (state.rewindTo) {
+            var passage = findPassageParent(el);
+            if (passage && passage.parentNode.lastChild != passage) {
+                state.rewindTo(passage, true);
+            }
+        }
+        if (title) {
+            state.display(title, el, null, callback);
+        }
+        else if (typeof callback == "function") {
+            callback();
+        }
+    };
+};
+
+Wikifier.createInternalLink = function (place, title, callback, type) {
+    var tag = (type == "button" ? 'button' : 'a'),
+        suffix = (type == "button" ? "Button" : "Link"),
+        el = insertElement(place, tag);
+
+    el.tabIndex = 0;
+    if (tale.has(title)) {
+        el.className = 'internal'+suffix;
+        if (visited(title)) el.className += ' visited'+suffix;
+    }
+    else el.className = 'broken'+suffix;
+
+    addClickHandler(el, Wikifier.linkFunction(title, el, callback));
+
+    if (place) place.appendChild(el);
+
+    return el;
+};
+
+Wikifier.createExternalLink = function (place, url, callback, type) {
+    var tag = (type == "button" ? 'button' : 'a'),
+        el = insertElement(place, tag);
+    el.href = url;
+    el.tabIndex = 0;
+    el.className = "external"+(type == "button" ? "Button" : "Link");
+    el.target = "_blank";
+    if (typeof callback == "function") {
+        addClickHandler(el,callback);
+    }
+    
+    if (place) place.appendChild(el);
+
+    return el;
+};
+
+// Functions usable solely by custom scripts
+// This includes restart(), above.
+function visited(e) {
+    var ret = 0, i = 0;
+    if (!state) {
+        return 0;
+    }
+    e = e || state.history[0].passage.title;
+    if (arguments.length > 1) {
+        for (ret = state.history.length; i<arguments.length; i++) {
+            ret = Math.min(ret, visited(arguments[i]));
+        }
+    }
+    else for(; i<state.history.length && state.history[i].passage; i++) {
+        if(e == state.history[i].passage.title) {
+            ret++;
+        }
+    }
+    return ret;
+}
+
+// Returns the number of times the player visited passages containing ALL
+// provided tags.
+// The tags can be several strings, or a single string with space-delimited tags.
+function visitedTag() {
+    var i, j, sh, ret = 0, tags = Array.prototype.slice.call(arguments);
+    if (tags.length == 1 && typeof tags[0] == "string") {
+        tags = tags.split(" ");
+    }
+    if (!state) {
+        return 0;
+    }
+    sh = state.history;
+    for(i = 0; i<sh.length && sh[i].passage; i++) {
+        for (j = 0; j < tags.length || void ret++; j++) {
+            if(sh[i].passage.tags.indexOf(tags[j])==-1) {
+                break;
+            }
+        }
+    }
+    return ret;
+}
+var visitedTags = visitedTag;
+
+function turns() {
+    return state.history.length-1;
+}
+
+function passage() {
+    return state.history[0].passage.title
+}
+
+function tags(e) {
+    var ret = [], i = 0;
+    if (!state) {
+        return 0;
+    }
+    e = e || state.history[0].passage.title;
+    if (arguments.length > 1) {
+        for (i = arguments.length-1; i >= 1; i--) {
+            ret = ret.concat(tags(arguments[i]));
+        }
+    }
+    ret = ret.concat(tale.get(e).tags);
+    return ret;
+}
+
+function previous() {
+    if (state && state.history[1]) {
+        for (var d = 1; d < state.history.length && state.history[d].passage; d++) {
+            if (state.history[d].passage.title != state.history[0].passage.title) {
+                return state.history[d].passage.title
+            }
+        }
+    }
+    return ""
+}
+
+// A random integer function
+// 1 argument: random int from 0 to a inclusive
+// 2 arguments: random int from a to b inclusive (order irrelevant)
+function random(a, b) {
+    var from, to;
+    if (!b) {
+        from = 0;
+        to = a;
+    } else {
+        from = Math.min(a, b);
+        to = Math.max(a, b);
+    }
+    to += 1;
+    return ~~((Math.random() * (to - from))) + from;
+}
+
+function either() {
+    if (Array.isArray(arguments[0]) && arguments.length == 1) {
+        return either.apply(this,arguments[0]);
+    }
+    return arguments[~~(Math.random()*arguments.length)];
+}
+
+function parameter(n) {
+    n = n || 0;
+    if (macros.display.parameters[n]) {
+        return macros.display.parameters[n];
+    }
+    return 0
+}
+
+function bookmark() {
+    return state.hash || "#";
+}
+
+/* Used to eval within Twine, but outside the context of a particular function */
+function internalEval(s) {
+    // eval("{x:1,y:1}") fails miserably unless the obj. literal
+    // is not the first expression in the line (hence, "0,").
+    return eval("0,"+s);
+}
+/* Used to execute script passages */
+function scriptEval(s) {
+    try {
+        eval(s.text);
+    } catch (e) {
+        alert("There is a technical problem with this " + tale.identity() + " (" + s.title + ": " + e.message + ")."+softErrorMessage);
+    }
+}
+/* Unload prompt */
+window.onbeforeunload = function() {
+    if (tale && tale.storysettings.lookup("exitprompt",false) && state && state.history.length > 1) {
+        return "You are about to end this " + tale.identity() + ".";
+    }
+};
+/* Error reporting */
+var oldOnError = window.onerror || null, 
+softErrorMessage = " You may be able to continue playing, but some parts may not work properly.";
+
+window.onerror = function (msg, a, b, c, error) {
+    var s = (error && (".\n\n" + error.stack.replace(/\([^\)]+\)/g,'') + "\n\n")) || (" (" + msg + ").\n");
+    alert("Sorry to interrupt, but this " + ((tale && tale.identity && tale.identity()) || "page") + "'s code has got itself in a mess" + s + softErrorMessage.slice(1));
+    // Restore previous onerror
+    window.onerror = oldOnError;
+    if (typeof window.onerror == "function") {
+        window.onerror(msg, a, b, c, error);
+    }
+};
+
+/* Init function */
+var $;
+function main() {
+    // Used by old custom scripts.
+    // Cedes to jQuery if it exists.
+    // Since jQuery is inserted after this script element,
+    // wait until main() is called before doing this.
+    $ = window.$ || function(a) {
+        return (typeof a == "string" ? document.getElementById(a) : a);
+    }
+    var imgs, scripts, macro, style, i,
+        styleText = "",
+        passages = document.getElementById("passages");
+    
+    // Run checks after custom macros are installed
+    function sanityCheck(thing) {
+        var i, j, s = "NOTE: The " + thing,
+            checks = { prerender: prerender, postrender: postrender, macros: macros };
+        // Warn if prerender/postrender/macros aren't objects, and
+        // prerender/postrender's own properties aren't functions.
+        for (i in checks) {
+            if (Object.prototype.hasOwnProperty.call(checks, i) && !sanityCheck[i]) {
+                if (!checks[i] || typeof checks[i]  != "object") {
+                    alert(s + " seems to have corrupted the " + i + " object."+softErrorMessage);
+                    sanityCheck[i] = true;
+                    continue;
+                }
+                if (i != "macros") {
+                    for (j in checks[i]) {
+                        if (Object.prototype.hasOwnProperty.call(checks[i], j)
+                                && typeof checks[i][j] != "function") {
+                            alert(s + " added a property '" + j + "' to " + i + ", "
+                                +"which is a "+typeof checks[i][j]+", not a function."+softErrorMessage);
+                            sanityCheck[i] = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Check for basic compatibility
+    if (!window.JSON || !document.querySelector) {
+        return (passages.innerHTML = "This " + tale.identity() + " requires a newer web browser. Sorry.");
+    } else {
+        passages.innerHTML = "";
+    }
+    // Initialise Tale
+    tale = window.tale = new Tale();
+    
+    // Check for IE8 image compatibility
+    if (~document.documentElement.className.indexOf("lt-ie9")) {
+        imgs = tale.lookup("tags", "Twine.image");
+        for (i = 0; i < imgs.length; i++) {
+            if (imgs[i].text.length >= 32768) {
+                alert("NOTE: This " + tale.identity() + "'s HTML file contains embedded images that may be too large for this browser to display."+softErrorMessage);
+                break;
+            }
+        }
+    }
+    // Run all script passages
+    scripts = tale.lookup("tags", "script");
+    for (i = 0; i < scripts.length; i++) {
+        scriptEval(scripts[i]);
+        sanityCheck('script passage "'+scripts[i].title+'"');
+    }
+    // Need to create state now, since it's used by remember.init()
+    state = window.state = new History();
+    for (i in macros) {
+        macro = macros[i];
+        if (typeof macro.init == "function") {
+            macro.init();
+            sanityCheck('init() of the custom macro "'+i+'"');
+        }
+    }
+    // Run all stylesheet passages
+    style = document.getElementById("storyCSS");
+    for (i in tale.passages) {
+        i = tale.passages[i];
+        if (i.tags.indexOf("stylesheet")==-1) {
+            continue;
+        }
+        // No other tags?
+        if (i.tags + "" == "stylesheet") {
+            styleText += i.text;
+        }
+        else if (i.tags.length == 2 && i.tags.indexOf("transition") >-1) {
+            setTransitionCSS(i.text);
+        }
+    }
+    styleText = alterCSS(styleText);
+    style.styleSheet ? (style.styleSheet.cssText = styleText) : (style.innerHTML = styleText);
+    
+    state.init();
+}
+
+setTimeout(function f() {
+    var size, bar = document.getElementById("loadingbar"), store = document.getElementById("storeArea");
+    if (!bar) {
+        return;
+    }
+    if (store) {
+        size = store.getAttribute("data-size");
+        if (store.children.length <= size && !tale) {
+            // +1 so that the bar can reach the end
+            bar.style.width = ~~((store.children.length+1)/size*100)+"%";
+        }
+        else {
+            bar.outerHTML = "";
+            return;
+        }
+    }
+    setTimeout(f,5);
+},5);
+
+
+/*
+**
+** Sugarcane/Responsive specific code follows
+**
+*/
+var hasPushState = !!window.history && (typeof window.history.pushState == "function") && (function(a) {
+    // iOS Safari: setItem throws in private mode
+    try {
+        a.setItem("test", '1');
+        a.removeItem("test");
+        return true;
+    } catch (e) {
+        return false;
+    }
+}(window.sessionStorage));
+
+Tale.prototype.canBookmark = function() {
+    return this.canUndo() && !this.storysettings.lookup('hash') && (this.storysettings.lookup('bookmark',true) || !hasPushState);
+};
+History.prototype.init = function () {
+    var a = this;
+    if (!this.restore()) {
+        if (tale.has("StoryInit")) {
+            new Wikifier(insertElement(null, "span"), tale.get("StoryInit").text);
+        }
+        this.display("Start", null)
+    }
+    if (!hasPushState) {
+        this.hash = window.location.hash;
+        this.interval = window.setInterval(function () {
+            a.watchHash()
+        }, 250)
+    }
+};
+hasPushState && (History.prototype.pushState = function(replace, uri) {
+    window.history[replace ? "replaceState" : "pushState"]({ id: this.id, length: this.history.length }, document.title, uri);
+});
+History.prototype.display = function (title, source, type, callback) {
+    var i, e, q, bookmark, hash, c = tale.get(title), p = document.getElementById("passages");
+    if (c==null) {
+        return;
+    }
+    if (type != "back") {
+        this.saveVariables(c, source, callback);
+        hash = (tale.storysettings.lookup('hash') && this.save()) || "";
+        if (hasPushState && tale.canUndo()) {
+            try {
+                sessionStorage.setItem("Twine.History"+this.id, JSON.stringify(decompile(this.history)));
+                this.pushState(this.history.length <= 2 && window.history.state == "", hash);
+            } catch(e) {
+                alert("Your browser couldn't save the state of the " + tale.identity() +".\n"+
+                    "You may continue playing, but it will no longer be possible to undo moves from here on in.");
+                tale.storysettings.undo="off";
+            }
+        }
+    }
+    this.hash = hash || this.save();
+    e = c.render();
+    if (type != "quietly") {
+        if (hasTransition) {
+            for(i = 0; i < p.childNodes.length; i += 1) {
+                q = p.childNodes[i];
+                q.classList.add("transition-out");
+                setTimeout((function(a) { return function () {
+                    if(a.parentNode) a.parentNode.removeChild(a);
+                }}(q)), 1000);
+            }
+            e.classList.add("transition-in");
+            setTimeout(function () { e.classList.remove("transition-in"); }, 1);
+            e.style.visibility = "visible";
+            p.appendChild(e);
+        } else {
+            removeChildren(p);
+            p.appendChild(e);
+            fade(e, {
+                fade: "in"
+            })
+        }
+    }
+    else {
+        p.appendChild(e);
+        e.style.visibility = "visible"
+    }
+    tale.setPageElements();
+    if (tale.canUndo()) {
+        if (!hasPushState && type != "back") {
+            window.location.hash = this.hash;
+        } else if (tale.canBookmark()) {
+            bookmark = document.getElementById("bookmark");
+            bookmark && (bookmark.href = this.hash);
+        }
+    }
+    window.scroll(0, 0)
+    return e
+};
+History.prototype.watchHash = function () {
+    if (window.location.hash != this.hash) {
+        if (window.location.hash && (window.location.hash != "#")) {
+            this.history = [{
+                passage: null,
+                variables: {}
+            }];
+            removeChildren(document.getElementById("passages"));
+            if (!this.restore()) {
+                alert("The passage you had previously visited could not be found.")
+            }
+        } else {
+            window.location.reload()
+        }
+        this.hash = window.location.hash
+    }
+};
+History.prototype.loadLinkVars = function() {
+    for (var c in this.history[0].linkVars) {
+        this.history[0].variables[c] = clone(this.history[0].linkVars[c]);
+    }
+};
+Passage.prototype.render = function () {
+    var b = insertElement(null, 'div', 'passage' + this.title, 'passage');
+    b.style.visibility = 'hidden';
+    this.setTags(b);
+    this.setCSS();
+    insertElement(b, 'div', '', 'header');
+    var a = insertElement(b, 'div', '', 'body content');
+    for (var i in prerender) {
+        (typeof prerender[i] == "function") && prerender[i].call(this,a);
+    }
+    new Wikifier(a, this.processText());
+    insertElement(b, 'div', '', 'footer');
+    for (i in postrender) {
+        (typeof postrender[i] == "function") && postrender[i].call(this,a);
+    }
+    return b;
+};
+Passage.prototype.excerpt = function () {
+    var b = this.text.replace(/<<.*?>>/g, "");
+    b = b.replace(/!.*?\n/g, "");
+    b = b.replace(/[\[\]\/]/g, "");
+    var a = b.split("\n");
+    while (a.length && a[0].length == 0) a.shift();
+    var c = '';
+    if (a.length == 0 || a[0].length == 0) c = this.title;
+    else c = a[0].substr(0, 30) + '...';
+    return c;
+};
+Passage.transitionCache = "";
+Passage.prototype.setCSS = function() {
+    var trans = false, text = "", tags = this.tags || [],
+        c = document.getElementById('tagCSS'),
+        c2 = document.getElementById('transitionCSS');
+    
+    if (c && c.getAttribute('data-tags') != tags.join(' ')) {
+        tale.forEachStylesheet(tags, function(passage) {
+            if (~passage.tags.indexOf("transition")) {
+                if (!Passage.transitionCache && c2)
+                    Passage.transitionCache = c2.innerHTML;
+                setTransitionCSS(passage.text);
+                trans = true;
+            }
+            else text += alterCSS(passage.text);
+        });
+        if (!trans && Passage.transitionCache && c2) {
+            setTransitionCSS(Passage.transitionCache);
+            trans = false;
+            Passage.transitionCache = "";
+        }
+        c.styleSheet ? (c.styleSheet.cssText = text) : (c.innerHTML = text);
+        c.setAttribute('data-tags', tags.join(' '));
+    }
+};
+
+var Interface = {
+    init: function () {
+        var snapback = document.getElementById("snapback"),
+            restart = document.getElementById("restart"),
+            bookmark = document.getElementById("bookmark");
+        main();
+        if (!tale) {
+            return;
+        }
+        if (snapback) {
+            if (!tale.lookup("tags", "bookmark").length) {
+                snapback.parentNode.removeChild(snapback);
+            } else addClickHandler(snapback, Interface.showSnapback);
+        }
+        if (bookmark && (!tale.canBookmark() || !hasPushState)) {
+            bookmark.parentNode.removeChild(bookmark);
+        }
+        restart && addClickHandler(restart, Interface.restart);
+    },
+    restart: function () {
+        if (confirm("Are you sure you want to restart this " + tale.identity() + "?")) {
+            state.restart()
+        }
+    },
+    showSnapback: function (a) {
+        Interface.hideAllMenus();
+        Interface.buildSnapback();
+        Interface.showMenu(a, document.getElementById("snapbackMenu"))
+    },
+    buildSnapback: function () {
+        var b, c = false,
+            menuelem = document.getElementById("snapbackMenu");
+        while (menuelem.hasChildNodes()) {
+            menuelem.removeChild(menuelem.firstChild)
+        }
+        for(var a = state.history.length - 1; a >= 0; a--) {
+            if(state.history[a].passage && state.history[a].passage.tags.indexOf("bookmark") != -1) {
+                b = document.createElement("div");
+                b.pos = a;
+                addClickHandler(b, function () {
+                    return macros.back.onclick(true, this.pos);
+                });
+                b.innerHTML = state.history[a].passage.excerpt();
+                menuelem.appendChild(b);
+                c = true
+            }
+        }
+        b = null
+        if(!c) {
+            b = document.createElement("div");
+            b.innerHTML = "<i>No passages available</i>";
+            document.getElementById("snapbackMenu").appendChild(b)
+        }
+    },
+    hideAllMenus: function () {
+        document.getElementById("snapbackMenu").style.display = "none"
+    },
+    showMenu: function (b, a) {
+        if (!b) {
+            b = window.event
+        }
+        var c = {
+            x: 0,
+            y: 0
+        };
+        if (b.pageX || b.pageY) {
+            c.x = b.pageX;
+            c.y = b.pageY
+        } else {
+            if (b.clientX || b.clientY) {
+                c.x = b.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+                c.y = b.clientY + document.body.scrollTop + document.documentElement.scrollTop
+            }
+        }
+        a.style.top = c.y + "px";
+        a.style.left = c.x + "px";
+        a.style.display = "block";
+        addClickHandler(document, Interface.hideAllMenus);
+        b.cancelBubble = true;
+        if (b.stopPropagation) {
+            b.stopPropagation()
+        }
+    }
+};
+window.onload = Interface.init;
+
+macros.back.onclick = function(back, steps) {
+    var title;
+    if (back) {
+        if (tale.canUndo()) {
+            window.history.go(-steps);
+            return;
+        }
+        while(steps-- >= 0 && state.history.length>1) {
+            title = state.history[0].passage.title;
+            state.history.shift();
+        }
+        state.loadLinkVars();
+        state.saveVariables(tale.get(title));
+        state.display(title, null, "back");
+    }
+    else {
+        state.display(state.history[steps].passage.title);
+    }
+};
+
+window.onpopstate = function(e) {
+    var title, hist, steps, i, s = e && e.state;
+    if (s && s.id && s.length != null) {
+        hist = recompile(JSON.parse(sessionStorage.getItem("Twine.History"+s.id)));
+        if (hist) {
+            steps = hist.length-s.length;
+        }
+    }
+    if (steps != null) {
+        state.history = hist;
+        // Shift the position of history to match how far back we've gone
+        while(steps-- >= 0 && state.history.length>1) {
+            title = state.history[0].passage.title;
+            state.history.shift();
+        }
+        state.loadLinkVars();
+        state.saveVariables(tale.get(title));
+        state.display(title, null, "back");
+    }
+};
+
+
+testplay = "";
+
+}());
+</script>
+<script title="modules">
+
+
+</script>
+<style id="baseCSS">
+/* Sidebar */
+#sidebar {
+	position: fixed;
+	list-style: none;
+	width: 12em;
+}
+#sidebar #title, #sidebar #credits  {
+	cursor: auto;
+}
+#sidebar #storySubtitle, #sidebar #storyMenu {
+	display: block;
+}
+.menu {
+	position: absolute;
+	display: none;
+	z-index: 5;
+}
+/* Passages container */
+#passages {
+	margin-left: 18.2em;
+	position:relative;
+}
+/* Links */
+.passage a {
+	color: #4d6ad8;
+}
+a.internalLink, a.externalLink, a.back, a.return, [data-passage], .menu div {
+	cursor: pointer;
+}
+a.brokenLink {
+	background-color: red;
+	color: #000;
+}
+.marked {
+	background-color: #f66;
+	color: #000;
+}
+.marked[title] {
+	cursor: help;
+}
+.passage li[data-bullet] {
+	list-style-type: none;
+}
+.passage li[data-bullet]:before {
+	content: attr(data-bullet);
+	position: relative;
+	left: -1em;
+}
+#storeArea {
+	display: none;
+}
+#noscript {
+	margin-left: 18.2em;
+	font-size: 1.2em;
+	font-weight: bold;
+}
+/* HTML4 compatibility */
+img {
+	vertical-align:bottom;
+}
+@media screen and (max-width: 640px) {
+	#sidebar {
+		position: static;
+		margin: 0 auto;
+		padding: 0;
+	}
+	body #sidebar li  {
+		text-align: center;
+	}
+	#passages {
+		min-height: 100vh;
+		margin-left: 0em;
+	}
+}
+#loadingbar {
+	position:fixed;
+	top:0;
+	left:0;
+	border-top: solid #4d6ad8 6px;
+	transition: width 0.5s;
+}
+</style>
+<style id="defaultCSS">
+body {
+	background-color: #000;
+	color: #fff;
+	font-family: Verdana,sans-serif;
+	font-size: 62.5%;
+	margin: 4em 15% 5% 5em;
+}
+#sidebar {
+	left: 7.5em;
+	margin: 0;
+	padding: 0 1em 0 0;
+	font: bold 1.1em Verdana,sans-serif;
+}
+#sidebar ul {
+	padding: 0;
+}
+#sidebar li {
+	color: #333;
+	text-align: right;
+	background-repeat: no-repeat;
+	margin-bottom: 1em;
+	line-height: 1.4em;
+	list-style: none;
+}
+#sidebar li a {
+	color: #333;
+	text-decoration: none;
+}
+#sidebar li a:hover, #sidebar #title a:hover, #snapback:hover, #restart:hover {
+	color: #fff;
+	cursor: pointer;
+	text-decoration: none;
+}
+#sidebar #title {
+	font-size: 150%;
+}
+#sidebar #title, #sidebar #title:hover, #sidebar #title a {
+	color: #999;
+}
+#sidebar #storySubtitle {
+	font-size: 75%;
+}
+#storyAuthor {
+	font-size: 50%;
+}
+#sidebar #storyMenu {
+	line-height: 2.5em;
+	margin-bottom: .5em;
+	color: #999;
+	cursor: auto;
+}
+#sidebar #credits {
+	padding-top: 2em;
+	font-weight: normal;
+	font-size: 80%;
+}
+#sidebar #credits:hover {
+	color: #333;
+}
+#sidebar #credits a {
+	text-decoration: none;
+}
+#passages {
+	border-left: 1px solid #333;
+	padding-left: 1.5em;
+}
+.menu {
+	background-color: #343434;
+	color: #fff;
+	opacity: .9;
+	border: 1px solid #fff;
+	text-align: left;
+	font: 1.1em Verdana;
+	line-height: 2em;
+}
+.menu div {
+	padding: 0 .4em;
+}
+.menu div:hover {
+	cursor: pointer;
+	background-color: #fff;
+	color: #343434;
+}
+.passage {
+	font-size: 1.2em;
+	line-height: 175%;
+	margin-bottom: 2em;
+	text-align: left;
+}
+.passage a {
+	font-weight: bold;
+	text-decoration: none;
+}
+.passage a:hover {
+	color: #8ea6ff;
+	text-decoration: underline;
+}
+.content > ul {
+	padding-top: 1.3em;
+}
+.passage ul, .passage ol {
+	margin-left: .5em;
+	padding-left: 1.5em;
+}
+.passage li {
+	margin-right: 6em;
+}
+.passage table {
+	border-collapse: collapse;
+	font-size: 100%;
+	margin: .8em 1.0em;
+}
+.passage th,.passage td,.passage tr,.passage caption {
+	padding: 3px;
+}
+.passage hr {
+	height: 1px;
+}
+.passage center {
+	max-width:50%;
+	margin:auto;
+}
+.marked {
+	margin-right: 12px;
+	padding: 3px;
+}
+.disabled {
+	font-weight: bold;
+	color: #333;
+}
+@media screen and (max-width: 640px) {
+	body {
+		margin: 5%;
+	}
+	#sidebar {
+		width:100%;
+		margin: 0;
+		border-bottom: 1px solid #333;
+	}
+	#passages {
+		padding-top: 2em;
+		border-left: 0;
+	}
+}
+</style>
+<style id="transitionCSS">
+.transition-in {
+	opacity:0;
+	position:absolute;
+}
+.passage:not(.transition-out) {
+	transition: 1s;
+	-webkit-transition: 1s;
+}
+.transition-out {
+	opacity:0 !important;
+	position:absolute;
+}
+</style>
+<style id="storyCSS"></style>
+<style id="tagCSS"></style>
+</head>
+<body>
+<div id="loadingbar"></div>
+<ul id="sidebar">
+<li id="title" class="storyElement"><span id="storyTitle" class="storyElement"></span><span id="storySubtitle" class="storyElement"></span><span id="titleSeparator"></span><span id="storyAuthor" class="storyElement"></span></li>
+<li id="storyMenu" class="storyElement" style="display:none"></li>
+<li><a href="javascript:;" id="snapback">Rewind</a></li>
+<li><a href="javascript:;" id="restart">Restart</a></li>
+<li><a id="bookmark" title="Permanent link to this passage">Bookmark</a></li>
+<li id="credits">
+This story was created with <a href="http://twinery.org/">Twine</a> and is powered by <a href="http://tiddlywiki.com/">TiddlyWiki</a>
+</li>
+</ul>
+<div id="snapbackMenu" class="menu"></div>
+<div id="passages">
+<noscript><div id="noscript">Please enable Javascript to play this story!</div></noscript>
+<style>
+#sidebar{display:none;}
+</style>
+</div>
+<div id="storeArea" data-size="5" hidden><div tiddler="1" tags="Twine.image" twine-position="262,10">data:image/png;base64,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</div><div tiddler="Start" twine-position="10,10">\nThis template demonstrates how to fade in an image over 5 seconds. \n\n&lt;div class=&quot;fade-in-image&quot;&gt;\n   [img[1]]\n&lt;/div&gt;</div><div tiddler="Stylesheet" tags="stylesheet" twine-position="199,253">\n.fade-in-image { animation: fadeIn 5s; }\n@keyframes fadeIn {\n  0% { opacity: 0; }\n  100% { opacity: 1; }\n}</div><div tiddler="StoryTitle" twine-position="10,150">Fade Image</div><div tiddler="StoryAuthor" twine-position="10,290">Meg</div></div></body></html>
